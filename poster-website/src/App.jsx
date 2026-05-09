@@ -176,7 +176,7 @@ export default function App() {
             </div>
             <div className="sumo-card glass-panel">
               <div className="sumo-card__img-wrapper">
-                <img src="/sumo_map.png" alt="SUMO Intersection" className="sumo-card__img" />
+                <img src="./sumo_map.png" alt="SUMO Intersection" className="sumo-card__img" />
                 <div className="sumo-card__pulse sumo-card__pulse--1" />
                 <div className="sumo-card__pulse sumo-card__pulse--2" />
                 <div className="sumo-card__pulse sumo-card__pulse--3" />
