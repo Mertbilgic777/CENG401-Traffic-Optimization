@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LineChart, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine, AreaChart, Area } from 'recharts';
 
 const ChevronDown = () => (
   <svg className="algo-item__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -81,41 +81,166 @@ function CompareBar({ label, value, max, barClass }) {
   );
 }
 
-// PPO training data (from ppo_llm.csv)
-const ppoTrainingData = [
-  {ep:1,wait:218},{ep:2,wait:288},{ep:3,wait:213},{ep:4,wait:84},{ep:5,wait:75},
-  {ep:6,wait:95},{ep:7,wait:226},{ep:8,wait:106},{ep:9,wait:74},{ep:10,wait:72},
-  {ep:11,wait:73},{ep:12,wait:79},{ep:13,wait:71},{ep:14,wait:69},{ep:15,wait:72},
-  {ep:16,wait:74},{ep:17,wait:77},{ep:18,wait:81},{ep:19,wait:79},{ep:20,wait:81},
-  {ep:21,wait:89},{ep:22,wait:76},{ep:23,wait:72},{ep:24,wait:52},{ep:25,wait:72}
+// Per-algorithm grouped chart data: PURE / LLM / RAG for each algo
+// Real data charts
+const realWaitChart = [
+  { name:'A2C', PURE:147.23, LLM:74.24, RAG:130.03 },
+  { name:'DDPG', PURE:141.47, LLM:140.47, RAG:142.28 },
+  { name:'DQN', PURE:134.43, LLM:133.43, RAG:134.75 },
+  { name:'PPO', PURE:134.98, LLM:133.11, RAG:133.86 },
 ];
-const a2cTrainingData = [
-  {ep:1,wait:293},{ep:2,wait:220},{ep:3,wait:147},{ep:4,wait:87},{ep:5,wait:64},
-  {ep:6,wait:65},{ep:7,wait:56},{ep:8,wait:67},{ep:9,wait:59},{ep:10,wait:61},
-  {ep:11,wait:58},{ep:12,wait:54},{ep:13,wait:73},{ep:14,wait:57},{ep:15,wait:61},
-  {ep:16,wait:65},{ep:17,wait:61},{ep:18,wait:59},{ep:19,wait:56},{ep:20,wait:63},
-  {ep:21,wait:53},{ep:22,wait:56},{ep:23,wait:71},{ep:24,wait:64},{ep:25,wait:59}
+const realCo2Chart = [
+  { name:'A2C', PURE:2005.82, LLM:1531.72, RAG:1773.36 },
+  { name:'DDPG', PURE:1727.12, LLM:1758.88, RAG:1741.16 },
+  { name:'DQN', PURE:1641.33, LLM:1630.88, RAG:1632.62 },
+  { name:'PPO', PURE:1842.15, LLM:1753.85, RAG:1734.06 },
+];
+const realSpeedChart = [
+  { name:'A2C', PURE:7.78, LLM:13.64, RAG:9.42 },
+  { name:'DDPG', PURE:10.49, LLM:10.21, RAG:10.32 },
+  { name:'DQN', PURE:10.68, LLM:10.79, RAG:10.75 },
+  { name:'PPO', PURE:9.67, LLM:10.38, RAG:10.48 },
+];
+const realQueueChart = [
+  { name:'A2C', PURE:10.37, LLM:6.71, RAG:8.76 },
+  { name:'DDPG', PURE:7.99, LLM:8.17, RAG:8.06 },
+  { name:'DQN', PURE:7.83, LLM:7.79, RAG:7.79 },
+  { name:'PPO', PURE:8.78, LLM:8.14, RAG:8.05 },
+];
+// Synthetic data charts
+const synthWaitChart = [
+  { name:'A2C', PURE:59.91, LLM:53.66, RAG:50.99 },
+  { name:'DDPG', PURE:58.82, LLM:58.07, RAG:59.16 },
+  { name:'DQN', PURE:61.36, LLM:60.27, RAG:59.59 },
+  { name:'PPO', PURE:51.27, LLM:76.09, RAG:47.14 },
+];
+const synthCo2Chart = [
+  { name:'A2C', PURE:186.21, LLM:182.52, RAG:179.82 },
+  { name:'DDPG', PURE:186.83, LLM:185.90, RAG:186.78 },
+  { name:'DQN', PURE:189.96, LLM:187.12, RAG:186.42 },
+  { name:'PPO', PURE:181.07, LLM:188.62, RAG:175.23 },
+];
+// Baselines
+const realBaseline = { wait:109.27, queue:9.66, co2:1879.09, speed:9.40 };
+const synthBaseline = { wait:132.08, queue:6.76, co2:192.16, speed:8.62 };
+// Mode colors
+const modeColors = { PURE:'#94a3b8', LLM:'#6366f1', RAG:'#10b981' };
+// Traffic flow data (from saha_verisi.rou.xml)
+const trafficFlowData = [
+  { period:'09:00', coffee:320, hastane:260, uni:280, metro:270, total:1130 },
+  { period:'09:15', coffee:340, hastane:210, uni:170, metro:150, total:870 },
+  { period:'12:00', coffee:260, hastane:150, uni:160, metro:180, total:750 },
+  { period:'12:15', coffee:340, hastane:160, uni:220, metro:190, total:910 },
+  { period:'16:30', coffee:480, hastane:500, uni:210, metro:190, total:1380 },
+  { period:'16:45', coffee:420, hastane:490, uni:200, metro:260, total:1370 },
 ];
 
-const barChartData = [
-  { name: 'Baseline', wait: 153.2, co2: 2453 },
-  { name: 'PPO+LLM', wait: 52.3, co2: 1393 },
-  { name: 'A2C+LLM', wait: 53.1, co2: 1422 },
-  { name: 'DQN+LLM', wait: 206.9, co2: 2069 },
-  { name: 'DDPG+LLM', wait: 221.6, co2: 1988 },
+const realData = [
+  { algo:'BASELINE', mode:'BASELINE', wait:109.27, queue:9.66, co2:1879.09, speed:9.40, waitL5:109.53, queueL5:9.69 },
+  { algo:'A2C', mode:'PURE', wait:147.23, queue:10.37, co2:2005.82, speed:7.78, waitL5:156.03, queueL5:10.84 },
+  { algo:'A2C', mode:'LLM', wait:74.24, queue:6.71, co2:1531.72, speed:13.64, waitL5:53.24, queueL5:5.62 },
+  { algo:'A2C', mode:'RAG', wait:130.03, queue:8.76, co2:1773.36, speed:9.42, waitL5:131.87, queueL5:9.07 },
+  { algo:'DDPG', mode:'PURE', wait:141.47, queue:7.99, co2:1727.12, speed:10.49, waitL5:143.08, queueL5:7.97 },
+  { algo:'DDPG', mode:'LLM', wait:140.47, queue:8.17, co2:1758.88, speed:10.21, waitL5:150.32, queueL5:8.21 },
+  { algo:'DDPG', mode:'RAG', wait:142.28, queue:8.06, co2:1741.16, speed:10.32, waitL5:148.95, queueL5:8.00 },
+  { algo:'DQN', mode:'PURE', wait:134.43, queue:7.83, co2:1641.33, speed:10.68, waitL5:135.73, queueL5:8.28 },
+  { algo:'DQN', mode:'LLM', wait:133.43, queue:7.79, co2:1630.88, speed:10.79, waitL5:135.55, queueL5:7.75 },
+  { algo:'DQN', mode:'RAG', wait:134.75, queue:7.79, co2:1632.62, speed:10.75, waitL5:131.17, queueL5:7.68 },
+  { algo:'PPO', mode:'PURE', wait:134.98, queue:8.78, co2:1842.15, speed:9.67, waitL5:130.79, queueL5:7.83 },
+  { algo:'PPO', mode:'LLM', wait:133.11, queue:8.14, co2:1753.85, speed:10.38, waitL5:133.94, queueL5:8.13 },
+  { algo:'PPO', mode:'RAG', wait:133.86, queue:8.05, co2:1734.06, speed:10.48, waitL5:135.93, queueL5:8.03 },
 ];
-const barColors = ['#94a3b8','#6366f1','#10b981','#06b6d4','#f59e0b'];
+
+const syntheticData = [
+  { algo:'BASELINE', mode:'BASELINE', wait:132.08, queue:6.76, co2:192.16, speed:8.62, waitL5:132.43, queueL5:6.75 },
+  { algo:'A2C', mode:'PURE', wait:59.91, queue:5.66, co2:186.21, speed:8.86, waitL5:59.69, queueL5:5.71 },
+  { algo:'A2C', mode:'LLM', wait:53.66, queue:5.49, co2:182.52, speed:9.13, waitL5:47.31, queueL5:5.21 },
+  { algo:'A2C', mode:'RAG', wait:50.99, queue:5.36, co2:179.82, speed:9.33, waitL5:49.34, queueL5:5.24 },
+  { algo:'DDPG', mode:'PURE', wait:58.82, queue:5.64, co2:186.83, speed:8.87, waitL5:58.64, queueL5:5.67 },
+  { algo:'DDPG', mode:'LLM', wait:58.07, queue:5.57, co2:185.90, speed:8.97, waitL5:59.66, queueL5:5.61 },
+  { algo:'DDPG', mode:'RAG', wait:59.16, queue:5.62, co2:186.78, speed:8.87, waitL5:55.46, queueL5:5.49 },
+  { algo:'DQN', mode:'PURE', wait:61.36, queue:5.94, co2:189.96, speed:8.86, waitL5:61.11, queueL5:5.93 },
+  { algo:'DQN', mode:'LLM', wait:60.27, queue:5.67, co2:187.12, speed:8.80, waitL5:60.09, queueL5:5.67 },
+  { algo:'DQN', mode:'RAG', wait:59.59, queue:5.63, co2:186.42, speed:8.82, waitL5:59.24, queueL5:5.63 },
+  { algo:'PPO', mode:'PURE', wait:51.27, queue:5.43, co2:181.07, speed:9.27, waitL5:47.54, queueL5:5.26 },
+  { algo:'PPO', mode:'LLM', wait:76.09, queue:5.87, co2:188.62, speed:8.85, waitL5:76.71, queueL5:5.94 },
+  { algo:'PPO', mode:'RAG', wait:47.14, queue:5.19, co2:175.23, speed:9.63, waitL5:46.44, queueL5:5.15 },
+];
+
+const compareAlgos = ['A2C','DDPG','DQN','PPO'];
+
+function getBestWorst(data, key, lower=true) {
+  const nonBaseline = data.filter(r => r.mode !== 'BASELINE');
+  const vals = nonBaseline.map(r => r[key]);
+  const best = lower ? Math.min(...vals) : Math.max(...vals);
+  const worst = lower ? Math.max(...vals) : Math.min(...vals);
+  return { best, worst };
+}
+
+function DataTable({ data, t }) {
+  const bw = {
+    wait: getBestWorst(data, 'wait', true),
+    queue: getBestWorst(data, 'queue', true),
+    co2: getBestWorst(data, 'co2', true),
+    speed: getBestWorst(data, 'speed', false),
+    waitL5: getBestWorst(data, 'waitL5', true),
+    queueL5: getBestWorst(data, 'queueL5', true),
+  };
+  const cls = (val, key) => {
+    if (val === bw[key].best) return 'best-value';
+    if (val === bw[key].worst) return 'worst-value';
+    return '';
+  };
+  const modeCls = (m) => m === 'BASELINE' ? 'mode-baseline' : m === 'LLM' ? 'mode-llm' : m === 'RAG' ? 'mode-rag' : 'mode-pure';
+  return (
+    <>
+      <div className="data-table-wrapper">
+        <table className="data-table">
+          <thead><tr>
+            <th>{t('exp_col_algo')}</th><th>{t('exp_col_mode')}</th>
+            <th>{t('exp_col_wait')}</th><th>{t('exp_col_queue')}</th>
+            <th>{t('exp_col_co2')}</th><th>{t('exp_col_speed')}</th>
+            <th>{t('exp_col_wait_last5')}</th><th>{t('exp_col_queue_last5')}</th>
+          </tr></thead>
+          <tbody>
+            {data.map((r, i) => (
+              <tr key={i} className={r.mode === 'BASELINE' ? 'baseline-row' : ''}>
+                <td className="algo-cell">{r.algo}</td>
+                <td><span className={`mode-cell ${modeCls(r.mode)}`}>{r.mode}</span></td>
+                <td className={r.mode !== 'BASELINE' ? cls(r.wait, 'wait') : ''}>{r.wait.toFixed(2)}</td>
+                <td className={r.mode !== 'BASELINE' ? cls(r.queue, 'queue') : ''}>{r.queue.toFixed(2)}</td>
+                <td className={r.mode !== 'BASELINE' ? cls(r.co2, 'co2') : ''}>{r.co2.toFixed(2)}</td>
+                <td className={r.mode !== 'BASELINE' ? cls(r.speed, 'speed') : ''}>{r.speed.toFixed(2)}</td>
+                <td className={r.mode !== 'BASELINE' ? cls(r.waitL5, 'waitL5') : ''}>{r.waitL5.toFixed(2)}</td>
+                <td className={r.mode !== 'BASELINE' ? cls(r.queueL5, 'queueL5') : ''}>{r.queueL5.toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="data-scroll-hint">← →</p>
+    </>
+  );
+}
 
 export default function App() {
   const { t, i18n } = useTranslation();
   const [openAlgo, setOpenAlgo] = useState(null);
+  const [chartTab, setChartTab] = useState('real');
+  const [flippedCharts, setFlippedCharts] = useState({});
+
   const toggle = useCallback((id) => setOpenAlgo(prev => prev === id ? null : id), []);
+  const toggleChart = useCallback((id) => setFlippedCharts(prev => ({...prev, [id]: !prev[id]})), []);
 
   const algos = [
-    { id:'ppo', color:'ppo', name:t('ppo_name'), full:t('ppo_full'), verdict:t('ppo_verdict'), verdictType:t('ppo_verdict_type'), desc:t('ppo_desc'), analogy:t('ppo_analogy'), analysis:t('ppo_analysis'), wait:t('ppo_wait'), co2:t('ppo_co2') },
-    { id:'a2c', color:'a2c', name:t('a2c_name'), full:t('a2c_full'), verdict:t('a2c_verdict'), verdictType:t('a2c_verdict_type'), desc:t('a2c_desc'), analogy:t('a2c_analogy'), analysis:t('a2c_analysis'), wait:t('a2c_wait'), co2:t('a2c_co2') },
-    { id:'dqn', color:'dqn', name:t('dqn_name'), full:t('dqn_full'), verdict:t('dqn_verdict'), verdictType:t('dqn_verdict_type'), desc:t('dqn_desc'), analogy:t('dqn_analogy'), analysis:t('dqn_analysis'), wait:t('dqn_wait'), co2:t('dqn_co2') },
-    { id:'ddpg', color:'ddpg', name:t('ddpg_name'), full:t('ddpg_full'), verdict:t('ddpg_verdict'), verdictType:t('ddpg_verdict_type'), desc:t('ddpg_desc'), analogy:t('ddpg_analogy'), analysis:t('ddpg_analysis'), wait:t('ddpg_wait'), co2:t('ddpg_co2') },
+    { id:'ppo', color:'ppo', name:t('ppo_name'), full:t('ppo_full'), verdict:t('ppo_verdict'), verdictType:t('ppo_verdict_type'), desc:t('ppo_desc'), analogy:t('ppo_analogy'), analysis:t('ppo_analysis'),
+      modes:{ PURE:{wait:134.98,co2:1842,speed:9.67,queue:8.78}, LLM:{wait:133.11,co2:1754,speed:10.38,queue:8.14}, RAG:{wait:133.86,co2:1734,speed:10.48,queue:8.05} } },
+    { id:'a2c', color:'a2c', name:t('a2c_name'), full:t('a2c_full'), verdict:t('a2c_verdict'), verdictType:t('a2c_verdict_type'), desc:t('a2c_desc'), analogy:t('a2c_analogy'), analysis:t('a2c_analysis'),
+      modes:{ PURE:{wait:147.23,co2:2006,speed:7.78,queue:10.37}, LLM:{wait:74.24,co2:1532,speed:13.64,queue:6.71}, RAG:{wait:130.03,co2:1773,speed:9.42,queue:8.76} } },
+    { id:'dqn', color:'dqn', name:t('dqn_name'), full:t('dqn_full'), verdict:t('dqn_verdict'), verdictType:t('dqn_verdict_type'), desc:t('dqn_desc'), analogy:t('dqn_analogy'), analysis:t('dqn_analysis'),
+      modes:{ PURE:{wait:134.43,co2:1641,speed:10.68,queue:7.83}, LLM:{wait:133.43,co2:1631,speed:10.79,queue:7.79}, RAG:{wait:134.75,co2:1633,speed:10.75,queue:7.79} } },
+    { id:'ddpg', color:'ddpg', name:t('ddpg_name'), full:t('ddpg_full'), verdict:t('ddpg_verdict'), verdictType:t('ddpg_verdict_type'), desc:t('ddpg_desc'), analogy:t('ddpg_analogy'), analysis:t('ddpg_analysis'),
+      modes:{ PURE:{wait:141.47,co2:1727,speed:10.49,queue:7.99}, LLM:{wait:140.47,co2:1759,speed:10.21,queue:8.17}, RAG:{wait:142.28,co2:1741,speed:10.32,queue:8.06} } },
   ];
 
   const steps = [
@@ -155,13 +280,17 @@ export default function App() {
           </section>
         </FadeSection>
 
-        {/* Key Stats */}
+        {/* Key Stats - calculated from real data: A2C+LLM vs Baseline */}
+        {/* CO2: (1879.09-1531.72)/1879.09 = 18.5% reduction */}
+        {/* Speed: 13.64/9.40 = 1.45x increase */}
+        {/* Queue: (9.66-6.71)/9.66 = 30.5% reduction */}
+        {/* Wait (real A2C+LLM): 32.1% reduction */}
         <FadeSection>
           <div className="stats-row">
-            <div className="stat-card"><div className="stat-card__value stat-card__value--green"><AnimatedValue value="50.6" suffix="%" /></div><div className="stat-card__label">{t('stat_wait')}</div></div>
-            <div className="stat-card"><div className="stat-card__value stat-card__value--cyan"><AnimatedValue value="40" suffix="%" /></div><div className="stat-card__label">{t('stat_co2')}</div></div>
-            <div className="stat-card"><div className="stat-card__value stat-card__value--blue"><AnimatedValue value="2.3" suffix="x" /></div><div className="stat-card__label">{t('stat_speed')}</div></div>
-            <div className="stat-card"><div className="stat-card__value stat-card__value--amber"><AnimatedValue value="58" suffix="%" /></div><div className="stat-card__label">{t('stat_queue')}</div></div>
+            <div className="stat-card"><div className="stat-card__value stat-card__value--green"><AnimatedValue value="32.1" suffix="%" /></div><div className="stat-card__label">{t('stat_wait')}</div></div>
+            <div className="stat-card"><div className="stat-card__value stat-card__value--cyan"><AnimatedValue value="18.5" suffix="%" /></div><div className="stat-card__label">{t('stat_co2')}</div></div>
+            <div className="stat-card"><div className="stat-card__value stat-card__value--blue"><AnimatedValue value="1.5" suffix="x" /></div><div className="stat-card__label">{t('stat_speed')}</div></div>
+            <div className="stat-card"><div className="stat-card__value stat-card__value--amber"><AnimatedValue value="30.5" suffix="%" /></div><div className="stat-card__label">{t('stat_queue')}</div></div>
           </div>
         </FadeSection>
 
@@ -176,7 +305,7 @@ export default function App() {
             </div>
             <div className="sumo-card glass-panel">
               <div className="sumo-card__img-wrapper">
-                <img src="./sumo_map.png" alt="SUMO Intersection" className="sumo-card__img" />
+                <img src="/sumo_map.png" alt="SUMO Intersection" className="sumo-card__img" />
                 <div className="sumo-card__pulse sumo-card__pulse--1" />
                 <div className="sumo-card__pulse sumo-card__pulse--2" />
                 <div className="sumo-card__pulse sumo-card__pulse--3" />
@@ -264,9 +393,27 @@ export default function App() {
                       <div className="algo-item__analysis-box">
                         <p className="algo-item__analysis">{a.analysis}</p>
                       </div>
-                      <div className="algo-item__mini-stats">
-                        <div className="algo-mini"><div className="algo-mini__value">{a.wait}</div><div className="algo-mini__label">{t('chart_wait_title')}</div></div>
-                        <div className="algo-mini"><div className="algo-mini__value">{a.co2}</div><div className="algo-mini__label">CO₂</div></div>
+                      <div className="algo-item__modes">
+                        <div className="algo-mode-header">
+                          <span></span><span>PURE</span><span>LLM</span><span>RAG</span>
+                        </div>
+                        <div className="algo-mode-row">
+                          <span className="algo-mode-label">⏱️ {t('chart_wait_title')}</span>
+                          {['PURE','LLM','RAG'].map(m => <span key={m} className={`algo-mode-val ${a.modes[m].wait <= realBaseline.wait ? 'algo-mode-val--good' : ''}`}>{a.modes[m].wait.toFixed(1)}s</span>)}
+                        </div>
+                        <div className="algo-mode-row">
+                          <span className="algo-mode-label">🌿 CO₂</span>
+                          {['PURE','LLM','RAG'].map(m => <span key={m} className={`algo-mode-val ${a.modes[m].co2 <= realBaseline.co2 ? 'algo-mode-val--good' : ''}`}>{a.modes[m].co2}g</span>)}
+                        </div>
+                        <div className="algo-mode-row">
+                          <span className="algo-mode-label">🏎️ {t('chart_speed_title')}</span>
+                          {['PURE','LLM','RAG'].map(m => <span key={m} className={`algo-mode-val ${a.modes[m].speed >= realBaseline.speed ? 'algo-mode-val--good' : ''}`}>{a.modes[m].speed.toFixed(1)}</span>)}
+                        </div>
+                        <div className="algo-mode-row">
+                          <span className="algo-mode-label">🚗 {t('chart_queue_title')}</span>
+                          {['PURE','LLM','RAG'].map(m => <span key={m} className={`algo-mode-val ${a.modes[m].queue <= realBaseline.queue ? 'algo-mode-val--good' : ''}`}>{a.modes[m].queue.toFixed(1)}</span>)}
+                        </div>
+                        <div className="algo-mode-baseline">Baseline: {realBaseline.wait}s | {realBaseline.co2}g | {realBaseline.speed} | {realBaseline.queue}</div>
                       </div>
                     </div>
                   </div>
@@ -276,7 +423,54 @@ export default function App() {
           </section>
         </FadeSection>
 
-        {/* Results */}
+        {/* Traffic Data Context */}
+        <FadeSection>
+          <section className="section">
+            <div className="section__header">
+              <div className="section__icon section__icon--amber">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              </div>
+              <h2 className="section__title">{t('traffic_title')}</h2>
+            </div>
+            <p className="discussion-intro">{t('traffic_desc')}</p>
+            <div className="chart-card">
+              <div className="chart-card__title">{t('traffic_chart_title')}</div>
+              <div style={{width:'100%',height:220}}>
+                <ResponsiveContainer>
+                  <AreaChart data={trafficFlowData} margin={{top:5,right:10,left:-15,bottom:5}}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.2}/>
+                    <XAxis dataKey="period" tick={{fontSize:10,fill:'#64748b'}}/>
+                    <YAxis tick={{fontSize:10,fill:'#64748b'}}/>
+                    <Tooltip/>
+                    <Legend wrapperStyle={{fontSize:10}}/>
+                    <Area type="monotone" dataKey="coffee" name={t('traffic_east')} stackId="1" fill="#6366f1" stroke="#6366f1" fillOpacity={0.6}/>
+                    <Area type="monotone" dataKey="hastane" name={t('traffic_west')} stackId="1" fill="#f59e0b" stroke="#f59e0b" fillOpacity={0.6}/>
+                    <Area type="monotone" dataKey="uni" name={t('traffic_north')} stackId="1" fill="#06b6d4" stroke="#06b6d4" fillOpacity={0.6}/>
+                    <Area type="monotone" dataKey="metro" name={t('traffic_south')} stackId="1" fill="#10b981" stroke="#10b981" fillOpacity={0.6}/>
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="traffic-info-grid">
+              <div className="traffic-info"><span className="traffic-info__dot" style={{background:'#6366f1'}}/><strong>E · 33.1%</strong> CoffeeLab</div>
+              <div className="traffic-info"><span className="traffic-info__dot" style={{background:'#f59e0b'}}/><strong>W · 22.9%</strong> {t('traffic_hospital')}</div>
+              <div className="traffic-info"><span className="traffic-info__dot" style={{background:'#06b6d4'}}/><strong>N · 19.1%</strong> {t('traffic_uni')}</div>
+              <div className="traffic-info"><span className="traffic-info__dot" style={{background:'#10b981'}}/><strong>S · 24.9%</strong> Metro</div>
+            </div>
+            <div className="traffic-compare">
+              <div className="traffic-compare__item">
+                <div className="traffic-compare__icon">🏙️</div>
+                <div><strong>{t('traffic_real_label')}</strong><br/><span className="traffic-compare__text">{t('traffic_real_text')}</span></div>
+              </div>
+              <div className="traffic-compare__item">
+                <div className="traffic-compare__icon">🧪</div>
+                <div><strong>{t('traffic_synth_label')}</strong><br/><span className="traffic-compare__text">{t('traffic_synth_text')}</span></div>
+              </div>
+            </div>
+          </section>
+        </FadeSection>
+
+        {/* Results - Per-Algorithm PURE/LLM/RAG */}
         <FadeSection>
           <section className="section">
             <div className="section__header">
@@ -287,90 +481,146 @@ export default function App() {
             </div>
             <p className="results-note">📊 {t('results_note')}</p>
 
-            {/* Bar Charts */}
-            <div className="chart-card">
-              <div className="chart-card__title">{t('chart_wait_title')} <span className="chart-card__subtitle">({t('chart_wait_unit')})</span></div>
-              <div style={{width:'100%',height:220}}>
-                <ResponsiveContainer>
-                  <BarChart data={barChartData} margin={{top:5,right:10,left:-15,bottom:5}}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.2}/>
-                    <XAxis dataKey="name" tick={{fontSize:10,fill:'#64748b'}}/>
-                    <YAxis tick={{fontSize:10,fill:'#64748b'}}/>
-                    <Tooltip/>
-                    <Bar dataKey="wait" radius={[4,4,0,0]}>
-                      {barChartData.map((_, i) => <Cell key={i} fill={barColors[i]}/>)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+            <div className="exp-tabs" style={{marginBottom:12}}>
+              <button className={`exp-tab ${chartTab==='real'?'active':''}`} onClick={()=>setChartTab('real')}>{t('exp_tab_real')}</button>
+              <button className={`exp-tab ${chartTab==='synthetic'?'active':''}`} onClick={()=>setChartTab('synthetic')}>{t('exp_tab_synthetic')}</button>
+            </div>
+
+            {/* Wait Time */}
+            <div className={`chart-flip-container ${flippedCharts.wait ? 'flipped' : ''}`} onClick={() => toggleChart('wait')}>
+              <div className="chart-flip-inner">
+                <div className="chart-flip-front" style={{padding: '16px', display: 'flex', flexDirection: 'column'}}>
+                  <div className="chart-card__title" style={{fontWeight: 700, marginBottom: '12px'}}>{t('chart_wait_title')} <span className="chart-card__subtitle" style={{fontWeight: 400, color: 'var(--clr-text-secondary)', fontSize: '0.8rem'}}>({t('chart_wait_unit')})</span></div>
+                  <div style={{width:'100%',flex:1}}>
+                    <ResponsiveContainer>
+                      <BarChart data={chartTab==='real'?realWaitChart:synthWaitChart} margin={{top:5,right:10,left:-15,bottom:5}}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.2}/>
+                        <XAxis dataKey="name" tick={{fontSize:10,fill:'#64748b'}}/>
+                        <YAxis tick={{fontSize:10,fill:'#64748b'}}/>
+                        <Tooltip/>
+                        <Legend wrapperStyle={{fontSize:11}}/>
+                        <ReferenceLine y={chartTab==='real'?realBaseline.wait:synthBaseline.wait} stroke="#ef4444" strokeDasharray="5 5" label={{value:'Baseline',position:'right',fontSize:9,fill:'#ef4444'}}/>
+                        <Bar dataKey="PURE" fill={modeColors.PURE} radius={[4,4,0,0]}/>
+                        <Bar dataKey="LLM" fill={modeColors.LLM} radius={[4,4,0,0]}/>
+                        <Bar dataKey="RAG" fill={modeColors.RAG} radius={[4,4,0,0]}/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="chart-flip-back">
+                  <div className="chart-flip-back__title">⏱️ {t('chart_wait_title')}</div>
+                  <p className="chart-flip-back__text">{t('chart_wait_back')}</p>
+                </div>
               </div>
             </div>
 
-            <div className="chart-card">
-              <div className="chart-card__title">{t('chart_co2_title')} <span className="chart-card__subtitle">({t('chart_co2_unit')})</span></div>
-              <div style={{width:'100%',height:220}}>
-                <ResponsiveContainer>
-                  <BarChart data={barChartData} margin={{top:5,right:10,left:-15,bottom:5}}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.2}/>
-                    <XAxis dataKey="name" tick={{fontSize:10,fill:'#64748b'}}/>
-                    <YAxis tick={{fontSize:10,fill:'#64748b'}}/>
-                    <Tooltip/>
-                    <Bar dataKey="co2" radius={[4,4,0,0]}>
-                      {barChartData.map((_, i) => <Cell key={i} fill={barColors[i]}/>)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+            {/* CO2 */}
+            <div className={`chart-flip-container ${flippedCharts.co2 ? 'flipped' : ''}`} onClick={() => toggleChart('co2')}>
+              <div className="chart-flip-inner">
+                <div className="chart-flip-front" style={{padding: '16px', display: 'flex', flexDirection: 'column'}}>
+                  <div className="chart-card__title" style={{fontWeight: 700, marginBottom: '12px'}}>{t('chart_co2_title')} <span className="chart-card__subtitle" style={{fontWeight: 400, color: 'var(--clr-text-secondary)', fontSize: '0.8rem'}}>({t('chart_co2_unit')})</span></div>
+                  <div style={{width:'100%',flex:1}}>
+                    <ResponsiveContainer>
+                      <BarChart data={chartTab==='real'?realCo2Chart:synthCo2Chart} margin={{top:5,right:10,left:-5,bottom:5}}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.2}/>
+                        <XAxis dataKey="name" tick={{fontSize:10,fill:'#64748b'}}/>
+                        <YAxis tick={{fontSize:10,fill:'#64748b'}}/>
+                        <Tooltip/>
+                        <Legend wrapperStyle={{fontSize:11}}/>
+                        <ReferenceLine y={chartTab==='real'?realBaseline.co2:synthBaseline.co2} stroke="#ef4444" strokeDasharray="5 5" label={{value:'Baseline',position:'right',fontSize:9,fill:'#ef4444'}}/>
+                        <Bar dataKey="PURE" fill={modeColors.PURE} radius={[4,4,0,0]}/>
+                        <Bar dataKey="LLM" fill={modeColors.LLM} radius={[4,4,0,0]}/>
+                        <Bar dataKey="RAG" fill={modeColors.RAG} radius={[4,4,0,0]}/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="chart-flip-back">
+                  <div className="chart-flip-back__title">🌿 {t('chart_co2_title')}</div>
+                  <p className="chart-flip-back__text">{t('chart_co2_back')}</p>
+                </div>
               </div>
             </div>
 
-            {/* Training Progress Line Chart */}
-            <div className="chart-card">
-              <div className="chart-card__title">{i18n.language==='tr'?'Eğitim İlerlemesi (Bekleme Süresi)':'Training Progress (Wait Time)'} <span className="chart-card__subtitle">({t('chart_wait_unit')})</span></div>
-              <div style={{width:'100%',height:220}}>
-                <ResponsiveContainer>
-                  <LineChart margin={{top:5,right:10,left:-15,bottom:5}}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.2}/>
-                    <XAxis dataKey="ep" type="number" domain={[1,25]} tick={{fontSize:10,fill:'#64748b'}} label={{value:i18n.language==='tr'?'Bölüm':'Episode',position:'insideBottom',offset:-2,fontSize:10,fill:'#94a3b8'}}/>
-                    <YAxis tick={{fontSize:10,fill:'#64748b'}}/>
-                    <Tooltip/>
-                    <Line data={ppoTrainingData} dataKey="wait" name="PPO+LLM" stroke="#6366f1" strokeWidth={2} dot={false} type="monotone"/>
-                    <Line data={a2cTrainingData} dataKey="wait" name="A2C+LLM" stroke="#10b981" strokeWidth={2} dot={false} type="monotone"/>
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="chart-legend">
-                <span className="chart-legend__item"><span className="chart-legend__dot" style={{background:'#6366f1'}}/>PPO+LLM</span>
-                <span className="chart-legend__item"><span className="chart-legend__dot" style={{background:'#10b981'}}/>A2C+LLM</span>
+            {/* Speed */}
+            <div className={`chart-flip-container ${flippedCharts.speed ? 'flipped' : ''}`} onClick={() => toggleChart('speed')}>
+              <div className="chart-flip-inner">
+                <div className="chart-flip-front" style={{padding: '16px', display: 'flex', flexDirection: 'column'}}>
+                  <div className="chart-card__title" style={{fontWeight: 700, marginBottom: '12px'}}>{t('chart_speed_title')} <span className="chart-card__subtitle" style={{fontWeight: 400, color: 'var(--clr-text-secondary)', fontSize: '0.8rem'}}>({t('chart_speed_unit')})</span></div>
+                  <div style={{width:'100%',flex:1}}>
+                    <ResponsiveContainer>
+                      <BarChart data={chartTab==='real'?realSpeedChart:[{name:'A2C',PURE:8.86,LLM:9.13,RAG:9.33},{name:'DDPG',PURE:8.87,LLM:8.97,RAG:8.87},{name:'DQN',PURE:8.86,LLM:8.80,RAG:8.82},{name:'PPO',PURE:9.27,LLM:8.85,RAG:9.63}]} margin={{top:5,right:10,left:-15,bottom:5}}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.2}/>
+                        <XAxis dataKey="name" tick={{fontSize:10,fill:'#64748b'}}/>
+                        <YAxis tick={{fontSize:10,fill:'#64748b'}}/>
+                        <Tooltip/>
+                        <Legend wrapperStyle={{fontSize:11}}/>
+                        <ReferenceLine y={chartTab==='real'?realBaseline.speed:synthBaseline.speed} stroke="#ef4444" strokeDasharray="5 5" label={{value:'Baseline',position:'right',fontSize:9,fill:'#ef4444'}}/>
+                        <Bar dataKey="PURE" fill={modeColors.PURE} radius={[4,4,0,0]}/>
+                        <Bar dataKey="LLM" fill={modeColors.LLM} radius={[4,4,0,0]}/>
+                        <Bar dataKey="RAG" fill={modeColors.RAG} radius={[4,4,0,0]}/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="chart-flip-back">
+                  <div className="chart-flip-back__title">🏎️ {t('chart_speed_title')}</div>
+                  <p className="chart-flip-back__text">{t('chart_speed_back')}</p>
+                </div>
               </div>
             </div>
 
-            {/* Comparison Bars */}
-            <div className="chart-card">
-              <div className="chart-card__title">{t('chart_wait_title')} <span className="chart-card__subtitle">({i18n.language==='tr'?'karşılaştırma':'comparison'})</span></div>
-              <div className="compare-bars">
-                <CompareBar label={t('baseline_label')} value={153.2} max={230} barClass="compare-bar__fill--baseline"/>
-                <CompareBar label={t('ppo_llm_label')} value={52.3} max={230} barClass="compare-bar__fill--ppo"/>
-                <CompareBar label={t('a2c_llm_label')} value={53.1} max={230} barClass="compare-bar__fill--a2c"/>
-                <CompareBar label={t('dqn_llm_label')} value={206.9} max={230} barClass="compare-bar__fill--dqn"/>
-                <CompareBar label={t('ddpg_llm_label')} value={221.6} max={230} barClass="compare-bar__fill--ddpg"/>
+            {/* Queue */}
+            <div className={`chart-flip-container ${flippedCharts.queue ? 'flipped' : ''}`} onClick={() => toggleChart('queue')}>
+              <div className="chart-flip-inner">
+                <div className="chart-flip-front" style={{padding: '16px', display: 'flex', flexDirection: 'column'}}>
+                  <div className="chart-card__title" style={{fontWeight: 700, marginBottom: '12px'}}>{t('chart_queue_title')} <span className="chart-card__subtitle" style={{fontWeight: 400, color: 'var(--clr-text-secondary)', fontSize: '0.8rem'}}>({t('chart_queue_unit')})</span></div>
+                  <div style={{width:'100%',flex:1}}>
+                    <ResponsiveContainer>
+                      <BarChart data={chartTab==='real'?realQueueChart:[{name:'A2C',PURE:5.66,LLM:5.49,RAG:5.36},{name:'DDPG',PURE:5.64,LLM:5.57,RAG:5.62},{name:'DQN',PURE:5.94,LLM:5.67,RAG:5.63},{name:'PPO',PURE:5.43,LLM:5.87,RAG:5.19}]} margin={{top:5,right:10,left:-15,bottom:5}}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.2}/>
+                        <XAxis dataKey="name" tick={{fontSize:10,fill:'#64748b'}}/>
+                        <YAxis tick={{fontSize:10,fill:'#64748b'}}/>
+                        <Tooltip/>
+                        <Legend wrapperStyle={{fontSize:11}}/>
+                        <ReferenceLine y={chartTab==='real'?realBaseline.queue:synthBaseline.queue} stroke="#ef4444" strokeDasharray="5 5" label={{value:'Baseline',position:'right',fontSize:9,fill:'#ef4444'}}/>
+                        <Bar dataKey="PURE" fill={modeColors.PURE} radius={[4,4,0,0]}/>
+                        <Bar dataKey="LLM" fill={modeColors.LLM} radius={[4,4,0,0]}/>
+                        <Bar dataKey="RAG" fill={modeColors.RAG} radius={[4,4,0,0]}/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="chart-flip-back">
+                  <div className="chart-flip-back__title">🚗 {t('chart_queue_title')}</div>
+                  <p className="chart-flip-back__text">{t('chart_queue_back')}</p>
+                </div>
               </div>
             </div>
           </section>
         </FadeSection>
 
-        {/* Discussion */}
+
+        {/* Deep Analysis Section */}
         <FadeSection>
           <section className="section">
             <div className="section__header">
-              <div className="section__icon section__icon--amber">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+              <div className="section__icon section__icon--indigo">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
               </div>
-              <h2 className="section__title">{t('discussion_title')}</h2>
+              <h2 className="section__title">{t('deep_title')}</h2>
             </div>
-            <p className="discussion-intro">{t('discussion_text')}</p>
-            <div className="discussion-cards">
-              <div className="discussion-card"><div className="discussion-card__icon">🔄</div><h4 className="discussion-card__title">{t('discussion_onpolicy')}</h4><p className="discussion-card__text">{t('discussion_onpolicy_text')}</p></div>
-              <div className="discussion-card"><div className="discussion-card__icon">🎯</div><h4 className="discussion-card__title">{t('discussion_action')}</h4><p className="discussion-card__text">{t('discussion_action_text')}</p></div>
-              <div className="discussion-card"><div className="discussion-card__icon">⚖️</div><h4 className="discussion-card__title">{t('discussion_stability')}</h4><p className="discussion-card__text">{t('discussion_stability_text')}</p></div>
+            <p className="deep-analysis-desc">{t('deep_desc')}</p>
+            <div className="deep-cards">
+              <div className="deep-card"><div className="deep-card__icon">🌊</div><h4 className="deep-card__title">{t('deep_traffic_title')}</h4><p className="deep-card__text">{t('deep_traffic_text')}</p></div>
+              <div className="deep-card"><div className="deep-card__icon">📊</div><h4 className="deep-card__title">{t('deep_variance_title')}</h4><p className="deep-card__text">{t('deep_variance_text')}</p></div>
+              <div className="deep-card"><div className="deep-card__icon">🤖</div><h4 className="deep-card__title">{t('deep_llm_title')}</h4><p className="deep-card__text">{t('deep_llm_text')}</p></div>
+              <div className="deep-card"><div className="deep-card__icon">🌿</div><h4 className="deep-card__title">{t('deep_co2_title')}</h4><p className="deep-card__text">{t('deep_co2_text')}</p></div>
+              <div className="deep-card"><div className="deep-card__icon">🏆</div><h4 className="deep-card__title">{t('deep_best_title')}</h4><p className="deep-card__text">{t('deep_best_text')}</p></div>
+            </div>
+            <div className="deep-conclusion">
+              <div className="deep-conclusion__title">📋 {t('deep_conclusion_title')}</div>
+              <p className="deep-conclusion__text">{t('deep_conclusion_text')}</p>
             </div>
           </section>
         </FadeSection>
